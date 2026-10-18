@@ -796,14 +796,17 @@
     ctx.scale(dpr, dpr);
 
     const letter = g.letters[g.idx];
-    const size = Math.round(Math.min(h * 0.8, w * 0.75));
+    // Las letras con tilde (como la Í) se dibujan algo más pequeñas y bajas para que quepa la tilde.
+    const accented = /[ÁÉÍÓÚÜ]/.test(letter);
+    const size = Math.round(Math.min(h * (accented ? 0.68 : 0.8), w * 0.75));
+    const baseline = h / 2 + size * (accented ? 0.47 : 0.35);
     const font = '800 ' + size + 'px Nunito, sans-serif';
     function paintLetter(c, color) {
       c.font = font;
       c.textAlign = 'center';
       c.textBaseline = 'alphabetic';
       c.fillStyle = color;
-      c.fillText(letter, w / 2, h / 2 + size * 0.35);
+      c.fillText(letter, w / 2, baseline);
     }
     paintLetter(ctx, '#E9E4DA');
 
