@@ -1,7 +1,7 @@
 /*
- * Mi semana — calendario y rutinas para peques.
+ * Mi semana — calendario, rutinas y juegos para peques.
  * Sin dependencias ni compilación. Tiene que funcionar en el Safari de iOS 12:
- * nada de ?. ni ??, ni módulos, ni APIs posteriores a 2018.
+ * nada de ?. ni ??, ni Pointer Events, ni módulos, ni APIs posteriores a 2018.
  */
 (function () {
   'use strict';
@@ -10,6 +10,7 @@
   // Datos fijos
 
   const STORAGE_KEY = 'mi-semana.v1';
+  const STATE_VERSION = 2;
 
   const SLOTS = [
     { id: 'manana', name: 'Mañana', say: 'Por la mañana', icon: '☀️' },
@@ -44,9 +45,9 @@
     '🧸', '🧩', '🖍️', '🎨', '📖', '📺', '🎵', '🎹', '🥁', '⚽', '🚲', '🛴',
     '🏊', '🤸', '🧱', '🚂', '🦖', '🎈', '🌳', '🏞️', '🏖️', '🛒', '🏫', '🏡',
     '👵', '👴', '🎂', '🎁', '🎉', '🐶', '🐱', '🐟', '🦁', '🚗', '🚌', '✈️',
-    '🏥', '💇', '🧺', '🌈', '⭐', '❤️', '🤗', '🎭'
+    '🏥', '💇', '🧺', '🌈', '⭐', '❤️', '🤗', '🎭', '🎲'
   ];
-  const EVENT_EMOJIS = ['🎂', '🎉', '🎁', '🎈', '👵', '👴', '🏖️', '✈️', '🚗', '🏥', '🎪', '🦁',
+  const EVENT_EMOJIS = ['🎉', '🎁', '🎈', '👵', '👴', '🏖️', '✈️', '🚗', '🏥', '🎪', '🦁',
     '🏊', '⚽', '🎭', '🎄', '🎃', '⭐'];
 
   const DEFAULT_LIBRARY = {
@@ -57,8 +58,9 @@
     comer: { emoji: '🍝', label: 'Comer' },
     merendar: { emoji: '🍎', label: 'Merendar' },
     parque: { emoji: '🌳', label: 'Ir al parque' },
-    jugar: { emoji: '🧸', label: 'Jugar' },
-    puzle: { emoji: '🧩', label: 'Puzles y juegos' },
+    jugar: { emoji: '🧸', label: 'Jugar con juguetes' },
+    juego: { emoji: '🎲', label: 'Juego del día', game: true },
+    puzle: { emoji: '🧩', label: 'Puzles' },
     pintar: { emoji: '🖍️', label: 'Pintar' },
     recoger: { emoji: '🧺', label: 'Recoger los juguetes' },
     mochila: { emoji: '🎒', label: 'Preparar la mochila' },
@@ -72,8 +74,8 @@
     dormir: { emoji: '😴', label: 'A dormir' }
   };
 
-  // Propuesta inicial: cole de lunes a viernes, baño en días alternos y
-  // la misma rutina de antes de dormir todos los días.
+  // Propuesta inicial: cole de lunes a viernes, un juego cada tarde, baño en
+  // días alternos y la misma rutina de antes de dormir todos los días.
   function defaultWeek() {
     const morning = ['desayunar', 'vestirse', 'dientes', 'cole'];
     const night = ['cenar', 'dibujos', 'pijama', 'dientes', 'pis', 'cuento', 'dormir'];
@@ -83,15 +85,36 @@
       items: { manana: manana.slice(), tarde: tarde.slice(), noche: noche.slice() }
     });
     return {
-      1: day('cole', morning, ['merendar', 'parque', 'recoger'], bathNight),
-      2: day('cole', morning, ['merendar', 'jugar', 'recoger'], night),
-      3: day('cole', morning, ['merendar', 'parque', 'recoger'], bathNight),
-      4: day('cole', morning, ['merendar', 'pintar', 'recoger'], night),
-      5: day('cole', morning, ['merendar', 'parque', 'recoger'], bathNight),
-      6: day('casa', ['desayunar', 'dientes', 'vestirse', 'puzle'], ['comer', 'parque', 'merendar'], night),
-      7: day('casa', ['desayunar', 'dientes', 'vestirse', 'jugar'], ['comer', 'merendar', 'mochila'], bathNight)
+      1: day('cole', morning, ['merendar', 'parque', 'juego', 'recoger'], bathNight),
+      2: day('cole', morning, ['merendar', 'jugar', 'juego', 'recoger'], night),
+      3: day('cole', morning, ['merendar', 'parque', 'juego', 'recoger'], bathNight),
+      4: day('cole', morning, ['merendar', 'pintar', 'juego', 'recoger'], night),
+      5: day('cole', morning, ['merendar', 'parque', 'juego', 'recoger'], bathNight),
+      6: day('casa', ['desayunar', 'dientes', 'vestirse', 'puzle'], ['comer', 'parque', 'juego', 'merendar'], night),
+      7: day('casa', ['desayunar', 'dientes', 'vestirse', 'jugar'], ['comer', 'merendar', 'juego', 'mochila'], bathNight)
     };
   }
+
+  // Juegos
+  const GAMES = [
+    { id: 'contar', icon: '🔢', name: 'Contar' },
+    { id: 'escribir', icon: '✍️', name: 'Escribir' },
+    { id: 'parejas', icon: '🐶', name: 'Parejas' }
+  ];
+  const COUNT_ROUNDS = 5;
+  const COUNT_THINGS = [
+    { e: '🍎', q: '¿Cuántas manzanas hay?', a: 'manzanas' },
+    { e: '🐟', q: '¿Cuántos peces hay?', a: 'peces' },
+    { e: '⭐', q: '¿Cuántas estrellas hay?', a: 'estrellas' },
+    { e: '🚗', q: '¿Cuántos coches hay?', a: 'coches' },
+    { e: '🎈', q: '¿Cuántos globos hay?', a: 'globos' },
+    { e: '🐶', q: '¿Cuántos perritos hay?', a: 'perritos' },
+    { e: '🌸', q: '¿Cuántas flores hay?', a: 'flores' },
+    { e: '🦆', q: '¿Cuántos patitos hay?', a: 'patitos' },
+    { e: '🍓', q: '¿Cuántas fresas hay?', a: 'fresas' },
+    { e: '⚽', q: '¿Cuántas pelotas hay?', a: 'pelotas' }
+  ];
+  const PAIR_ANIMALS = ['🐶', '🐱', '🐰', '🦊', '🐻', '🐼', '🐸', '🐵', '🦁', '🐮', '🐷', '🐯'];
 
   const GEAR_SVG = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/>' +
@@ -124,6 +147,7 @@
   }
   function longDate(d) { return d.getDate() + ' de ' + MONTHS[d.getMonth()]; }
   function shortDate(d) { return DAY_SHORT[weekday(d)].toLowerCase() + ' ' + d.getDate() + ' ' + MONTHS_SHORT[d.getMonth()]; }
+  function isLeap(y) { return y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0); }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
@@ -132,13 +156,22 @@
   }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function newId(prefix) { return prefix + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36); }
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i];
+      a[i] = a[j];
+      a[j] = t;
+    }
+    return a;
+  }
 
   // ---------------------------------------------------------------------------
   // Estado (se guarda en el propio iPad)
 
   function defaultState() {
     return {
-      version: 1,
+      version: STATE_VERSION,
       name: '',
       sound: true,
       tardeFrom: '13:30',
@@ -150,11 +183,28 @@
     };
   }
 
+  // Lleva un estado guardado por una versión anterior a la actual.
+  function migrate(s) {
+    if ((s.version || 1) < 2) {
+      // v2: un juego cada tarde.
+      if (!s.library.juego) s.library.juego = clone(DEFAULT_LIBRARY.juego);
+      for (let d = 1; d <= 7; d++) {
+        const tarde = s.week[d].items.tarde;
+        if (tarde.indexOf('juego') >= 0) continue;
+        const r = tarde.indexOf('recoger');
+        if (r >= 0) tarde.splice(r, 0, 'juego');
+        else tarde.push('juego');
+      }
+    }
+    s.version = STATE_VERSION;
+    return s;
+  }
+
   function loadState() {
     const base = defaultState();
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return Object.assign(base, JSON.parse(raw));
+      if (raw) return migrate(Object.assign(base, JSON.parse(raw)));
     } catch (e) {
       // Sin almacenamiento disponible: arrancamos con la propuesta.
     }
@@ -170,11 +220,12 @@
   }
 
   // Borra estrellas antiguas y fechas especiales que ya pasaron hace tiempo.
+  // Los cumpleaños se quedan: se repiten cada año.
   function prune() {
     const doneLimit = dateKey(addDays(today(), -14));
     Object.keys(state.done).forEach(k => { if (k < doneLimit) delete state.done[k]; });
     const eventLimit = dateKey(addDays(today(), -30));
-    state.events = state.events.filter(e => e.date >= eventLimit);
+    state.events = state.events.filter(e => e.kind === 'cumple' || e.date >= eventLimit);
     save();
   }
 
@@ -186,11 +237,49 @@
     return 'manana';
   }
 
+  // ---------------------------------------------------------------------------
+  // Fechas especiales y cumpleaños
+
+  function eventOn(e, key) {
+    if (e.kind !== 'cumple') return e.date === key;
+    const md = e.date.slice(5);
+    const kmd = key.slice(5);
+    if (md === kmd) return true;
+    // Los del 29 de febrero se celebran el 28 los años que no son bisiestos.
+    return md === '02-29' && kmd === '02-28' && !isLeap(+key.slice(0, 4));
+  }
+
+  // Próximo día (desde `fromKey`) en que toca la fecha.
+  function nextDate(e, fromKey) {
+    if (e.kind !== 'cumple') return e.date;
+    const y = +fromKey.slice(0, 4);
+    const md = e.date.slice(5);
+    return y + '-' + md >= fromKey ? y + '-' + md : (y + 1) + '-' + md;
+  }
+
+  function isChild(who) {
+    return !!state.name && String(who).trim().toLowerCase() === state.name.trim().toLowerCase();
+  }
+
+  // Texto para ver y para decir en voz alta.
+  function eventText(e, key) {
+    if (e.kind !== 'cumple') return { label: e.label, say: e.label };
+    const age = +key.slice(0, 4) - e.birthYear;
+    if (isChild(e.who)) {
+      return age > 0
+        ? { label: '¡Tu cumple! ' + age + ' años', say: '¡Es tu cumple! ¡Cumples ' + age + ' años!' }
+        : { label: '¡Tu cumple!', say: '¡Es tu cumple!' };
+    }
+    return age > 0
+      ? { label: 'Cumple de ' + e.who + ' · ' + age + ' años', say: 'Es el cumple de ' + e.who + '. ¡Cumple ' + age + ' años!' }
+      : { label: 'Cumple de ' + e.who, say: 'Es el cumple de ' + e.who + '.' };
+  }
+
   // Lo que toca un día concreto: la rutina de su día de la semana, salvo que
   // una fecha especial diga que no hay cole y pida usar otra rutina.
   function planFor(d) {
     const key = dateKey(d);
-    const events = state.events.filter(e => e.date === key);
+    const events = state.events.filter(e => eventOn(e, key));
     const holiday = events.filter(e => e.noCole)[0];
     const wd = weekday(d);
     const tpl = state.week[holiday ? holiday.useDay : wd] || state.week[wd];
@@ -207,11 +296,13 @@
   function cardsFor(plan, slot) {
     const cards = [];
     plan.events.forEach(e => {
-      if (e.slot === slot) cards.push({ key: 'ev:' + e.id, emoji: e.emoji, label: e.label, special: true });
+      if (e.slot !== slot) return;
+      const t = eventText(e, plan.key);
+      cards.push({ key: 'ev:' + e.id, emoji: e.emoji, label: t.label, say: t.say, special: true });
     });
     (plan.items[slot] || []).forEach(id => {
       const a = state.library[id];
-      if (a) cards.push({ key: slot + ':' + id, emoji: a.emoji, label: a.label });
+      if (a) cards.push({ key: slot + ':' + id, emoji: a.emoji, label: a.label, say: a.label, game: !!a.game });
     });
     return cards;
   }
@@ -227,7 +318,7 @@
     const hay = plan.type === 'cole' ? 'hay cole' : 'no hay cole';
     let s = isToday ? 'Hoy es ' + name + '. Hoy ' + hay + '.' : 'El ' + name + ' ' + hay + '.';
     if (plan.type !== 'cole' && plan.wd >= 6 && !plan.holiday) s += ' ¡Es fin de semana!';
-    plan.events.forEach(e => { s += ' ' + e.label + '.'; });
+    plan.events.forEach(e => { s += ' ' + eventText(e, plan.key).say; });
     return s;
   }
 
@@ -312,6 +403,7 @@
   const appEl = document.getElementById('app');
   const parentEl = document.getElementById('parent');
   const modalEl = document.getElementById('modal');
+  const gameEl = document.getElementById('game');
   const celebrateEl = document.getElementById('celebrate');
 
   const ui = {
@@ -324,13 +416,25 @@
     ptab: 'semana',
     pday: 1,
     modal: null,
+    game: null,
     evDraft: null
   };
   let lastTouch = Date.now();
   let celebrateTimer = null;
+  let gameTimer = null;
 
-  function newEventDraft() {
-    return { date: dateKey(addDays(today(), 1)), emoji: '🎂', label: '', slot: 'dia', noCole: false, useDay: 6 };
+  function newEventDraft(kind) {
+    return {
+      kind: kind || 'cumple',
+      date: dateKey(addDays(today(), 1)),
+      emoji: '🎉',
+      label: '',
+      who: '',
+      birthYear: '',
+      slot: 'dia',
+      noCole: false,
+      useDay: 6
+    };
   }
   ui.evDraft = newEventDraft();
 
@@ -352,8 +456,6 @@
     const done = state.done[plan.key] || {};
     const board = document.getElementById('board');
     const keepScroll = board && board.getAttribute('data-view') === ui.date + ui.slot ? board.scrollTop : 0;
-
-    document.body.className = 'slot-' + ui.slot;
 
     let html = '<header class="top">';
     html += '<button class="title" data-act="say-day">';
@@ -383,8 +485,9 @@
     if (dayEvents.length) {
       html += '<div class="banners">';
       dayEvents.forEach(e => {
-        html += '<button class="banner" data-act="say" data-text="' + esc(e.label) + '">' +
-          '<span class="banner-emoji">' + esc(e.emoji) + '</span><span class="banner-text">' + esc(e.label) + '</span></button>';
+        const text = eventText(e, plan.key);
+        html += '<button class="banner" data-act="say" data-text="' + esc(text.say) + '">' +
+          '<span class="banner-emoji">' + esc(e.emoji) + '</span><span class="banner-text">' + esc(text.label) + '</span></button>';
       });
       html += '</div>';
     }
@@ -411,11 +514,11 @@
       html += '<div class="cards">';
       cards.forEach((c, i) => {
         html += '<button class="card' + (done[c.key] ? ' is-done' : '') + (c.special ? ' is-special' : '') +
-          '" data-act="card" data-key="' + esc(c.key) + '">';
-        html += '<span class="card-step">' + (c.special ? '✨' : i + 1) + '</span>';
+          (c.game ? ' is-game' : '') + '" data-act="card" data-key="' + esc(c.key) + '">';
+        html += '<span class="card-step">' + (c.special ? '★' : i + 1) + '</span>';
         html += '<span class="card-emoji">' + esc(c.emoji) + '</span>';
         html += '<span class="card-label">' + esc(c.label) + '</span>';
-        html += '<span class="card-star" aria-hidden="true">⭐</span>';
+        html += '<span class="card-check" aria-hidden="true">✓</span>';
         html += '</button>';
       });
       html += '</div>';
@@ -455,65 +558,375 @@
   function toggleCard(key) {
     const isToday = ui.date === todayKey();
     const plan = planFor(parseKey(ui.date));
-    const cards = cardsFor(plan, ui.slot);
-    const card = cards.filter(c => c.key === key)[0];
+    const card = cardsFor(plan, ui.slot).filter(c => c.key === key)[0];
     if (!card) return;
     // Los otros días solo se miran (y se escuchan), no se marcan.
     if (!isToday) {
-      speak(card.label);
+      speak(card.say);
       return;
     }
-    const done = state.done[plan.key] || (state.done[plan.key] = {});
+    if (card.game) {
+      openGame(key, ui.slot);
+      return;
+    }
+    const done = state.done[plan.key] || {};
     if (done[key]) {
       delete done[key];
       save();
       renderKid();
-      speak(card.label);
+      speak(card.say);
       return;
     }
+    markDone(key, ui.slot, card.say + '. ¡Muy bien!');
+  }
+
+  // Marca una tarjeta de hoy como hecha; si era la última de esa parte del día, lo celebra.
+  function markDone(key, slot, sayText) {
+    const plan = planFor(today());
+    const done = state.done[plan.key] || (state.done[plan.key] = {});
     done[key] = true;
     save();
     renderKid();
     const fresh = Array.prototype.filter.call(appEl.querySelectorAll('.card'), n => n.getAttribute('data-key') === key)[0];
     if (fresh) fresh.className += ' pop';
     chime();
-    speak(card.label + '. ¡Muy bien!');
-    if (cards.every(c => done[c.key])) setTimeout(() => celebrate(ui.slot, plan), 700);
+    speak(sayText);
+    if (cardsFor(plan, slot).every(c => done[c.key])) setTimeout(() => celebrate(slot, plan), 700);
   }
 
   function celebrate(slot, plan) {
-    const cheers = {
-      manana: plan.type === 'cole' ? '¡Muy bien! ¡Al cole!' : '¡Muy bien! ¡A por el día!',
-      tarde: '¡Genial! ¡Qué tarde tan buena!',
-      noche: '¡Muy bien! ¡Buenas noches!'
-    };
-    const msg = cheers[slot];
-    let sparks = '';
-    const sparkEmojis = ['⭐', '✨', '🌟'];
-    for (let i = 0; i < 12; i++) sparks += '<span class="spark">' + sparkEmojis[i % 3] + '</span>';
-    celebrateEl.innerHTML = sparks + '<div class="cheer"><div class="big-star">🌟</div><h2>' + msg + '</h2></div>';
+    const sub = {
+      manana: plan.type === 'cole' ? '¡A por el cole!' : '¡A por el día!',
+      tarde: '¡Qué buena tarde!',
+      noche: '¡Buenas noches!'
+    }[slot];
+    celebrateEl.innerHTML = '<div class="cheer"><span class="cheer-mark">✓</span><h2>¡Muy bien!</h2><p>' + sub + '</p></div>';
     celebrateEl.className = 'celebrate show';
-    const nodes = celebrateEl.querySelectorAll('.spark');
-    // Dos frames para que el navegador pinte la posición inicial antes de animar.
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      for (let i = 0; i < nodes.length; i++) {
-        const a = (i / nodes.length) * Math.PI * 2;
-        const r = 200 + (i % 3) * 70;
-        const tr = 'translate(' + Math.round(Math.cos(a) * r) + 'px,' + Math.round(Math.sin(a) * r) + 'px) scale(1)';
-        nodes[i].style.webkitTransform = tr;
-        nodes[i].style.transform = tr;
-        nodes[i].style.opacity = '0';
-      }
-    }));
     chime([523.25, 659.25, 783.99, 1046.5]);
-    speak(msg, true);
+    speak('¡Muy bien! ' + sub, true);
     clearTimeout(celebrateTimer);
-    celebrateTimer = setTimeout(hideCelebrate, 3500);
+    celebrateTimer = setTimeout(hideCelebrate, 3000);
   }
 
   function hideCelebrate() {
     clearTimeout(celebrateTimer);
     celebrateEl.className = 'celebrate';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Juegos
+
+  function openGame(key, slot) {
+    ui.game = { key: key, slot: slot, view: 'menu' };
+    renderGame();
+    speak('¿A qué jugamos?');
+  }
+
+  function closeGame() {
+    clearTimeout(gameTimer);
+    ui.game = null;
+    renderGame();
+  }
+
+  // Al terminar un juego se marca la tarjeta que lo abrió.
+  function finishGame(sayText) {
+    const g = ui.game;
+    closeGame();
+    if (ui.date !== todayKey()) {
+      speak(sayText);
+      return;
+    }
+    ui.slot = g.slot;
+    markDone(g.key, g.slot, sayText);
+  }
+
+  function startGame(id) {
+    const g = ui.game;
+    clearTimeout(gameTimer);
+    g.view = id;
+    g.round = 0;
+    if (id === 'contar') {
+      g.thing = null;
+      newCountRound(g);
+      renderGame();
+      speak(g.thing.q);
+    } else if (id === 'escribir') {
+      g.letters = nameLetters();
+      g.idx = 0;
+      g.solved = false;
+      renderGame();
+      speak(state.name
+        ? 'Vamos a escribir ' + state.name + '. Empieza por la ' + g.letters[0]
+        : 'Vamos a escribir las vocales. Empieza por la A');
+    } else if (id === 'parejas') {
+      newPairs(g);
+      renderGame();
+      speak('Busca las parejas');
+    }
+  }
+
+  function newCountRound(g) {
+    let thing;
+    do {
+      thing = COUNT_THINGS[Math.floor(Math.random() * COUNT_THINGS.length)];
+    } while (thing === g.thing);
+    // Empieza con pocos y va subiendo: 2–4 en la primera ronda, hasta 2–8 en la última.
+    const max = Math.min(9, 4 + g.round);
+    const n = 2 + Math.floor(Math.random() * (max - 1));
+    const options = [n];
+    while (options.length < 3) {
+      const x = Math.max(1, n - 3) + Math.floor(Math.random() * 7);
+      if (x <= 10 && options.indexOf(x) < 0) options.push(x);
+    }
+    g.thing = thing;
+    g.n = n;
+    g.options = options.sort((a, b) => a - b);
+    g.counted = [];
+    g.wrong = [];
+    g.solved = false;
+  }
+
+  function nameLetters() {
+    const clean = String(state.name || '').toUpperCase().replace(/[^A-ZÁÉÍÓÚÜÑÇ]/g, '');
+    return (clean || 'AEIOU').split('').slice(0, 8);
+  }
+
+  function newPairs(g) {
+    const animals = shuffle(PAIR_ANIMALS.slice()).slice(0, 4);
+    g.cards = shuffle(animals.concat(animals)).map(e => ({ e: e, open: false, matched: false }));
+    g.first = -1;
+    g.lock = false;
+  }
+
+  const GAME_VIEWS = {
+    menu: () => {
+      let html = '<button class="g-ask" data-act="say" data-text="¿A qué jugamos?">¿A qué jugamos?</button><div class="g-menu">';
+      GAMES.forEach(x => {
+        html += '<button class="g-pick" data-act="game-open" data-game="' + x.id + '"><span class="g-pick-icon">' + x.icon +
+          '</span><span class="g-pick-name">' + x.name + '</span></button>';
+      });
+      return html + '</div>';
+    },
+
+    contar: g => {
+      let html = '<button class="g-ask" data-act="say" data-text="' + esc(g.thing.q) + '">' + esc(g.thing.q) + '</button>';
+      html += '<div class="count-field">';
+      for (let i = 0; i < g.n; i++) {
+        const order = g.counted.indexOf(i);
+        html += '<button class="count-item' + (order >= 0 ? ' is-counted' : '') + '" data-act="count-tap" data-i="' + i + '">' +
+          g.thing.e + (order >= 0 ? '<span class="count-num">' + (order + 1) + '</span>' : '') + '</button>';
+      }
+      html += '</div><div class="count-answers">';
+      g.options.forEach(o => {
+        const wrong = g.wrong.indexOf(o) >= 0;
+        const right = g.solved && o === g.n;
+        html += '<button class="count-ans' + (wrong ? ' is-wrong' : '') + (right ? ' is-right' : '') + '" data-act="count-answer" data-n="' +
+          o + '"' + (wrong || g.solved ? ' disabled' : '') + '>' + o + '</button>';
+      });
+      return html + '</div>';
+    },
+
+    escribir: g => {
+      let html = '<div class="trace-word">';
+      g.letters.forEach((l, i) => {
+        html += '<button class="trace-letter' + (i < g.idx ? ' is-done' : i === g.idx ? ' is-current' : '') +
+          '" data-act="say" data-text="La ' + esc(l) + '">' + esc(l) + '</button>';
+      });
+      html += '</div><p class="g-hint">Repasa la letra con el dedo</p>';
+      html += '<div class="trace-box" id="trace-box"><canvas id="trace-canvas"></canvas></div>';
+      html += '<div class="trace-actions"><button class="btn" data-act="trace-clear">Borrar</button></div>';
+      return html;
+    },
+
+    parejas: g => {
+      let html = '<button class="g-ask" data-act="say" data-text="Busca las parejas">Busca las parejas</button><div class="pairs">';
+      g.cards.forEach((c, i) => {
+        const shown = c.open || c.matched;
+        html += '<button class="pair' + (shown ? ' is-open' : '') + (c.matched ? ' is-matched' : '') + '" data-act="pair-flip" data-i="' + i + '">' +
+          (shown ? c.e : '') + '</button>';
+      });
+      return html + '</div>';
+    }
+  };
+
+  function renderGame() {
+    const g = ui.game;
+    if (!g) {
+      gameEl.className = '';
+      gameEl.innerHTML = '';
+      return;
+    }
+    const meta = GAMES.filter(x => x.id === g.view)[0];
+    let html = '<div class="g-head"><button class="btn g-back" data-act="game-back">' + (g.view === 'menu' ? '✕ Salir' : '‹ Juegos') + '</button>';
+    html += '<span class="g-title">' + (meta ? meta.icon + ' ' + meta.name : 'Juegos') + '</span><span class="g-progress">';
+    if (g.view === 'contar') {
+      for (let i = 0; i < COUNT_ROUNDS; i++) html += '<i class="dot' + (i < g.round ? ' on' : '') + '"></i>';
+    }
+    html += '</span></div>';
+    html += '<div class="g-body g-' + g.view + '">' + GAME_VIEWS[g.view](g) + '</div>';
+    gameEl.className = 'is-open';
+    gameEl.innerHTML = html;
+    if (g.view === 'escribir') setupTracing(g);
+  }
+
+  function segmentDistance(p, a, b) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = dx * dx + dy * dy;
+    const t = len ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len)) : 0;
+    const ex = a.x + t * dx - p.x;
+    const ey = a.y + t * dy - p.y;
+    return Math.sqrt(ex * ex + ey * ey);
+  }
+
+  // Dibuja la letra en gris y deja repasarla con el dedo. Se da por buena
+  // cuando el trazo ha pasado por tres cuartas partes de la letra sin salirse
+  // demasiado (para que no valga garabatear toda la pizarra).
+  function setupTracing(g) {
+    const box = document.getElementById('trace-box');
+    const canvas = document.getElementById('trace-canvas');
+    const w = box.clientWidth;
+    const h = box.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const letter = g.letters[g.idx];
+    const size = Math.round(Math.min(h * 0.8, w * 0.75));
+    const font = '800 ' + size + 'px Nunito, sans-serif';
+    function paintLetter(c, color) {
+      c.font = font;
+      c.textAlign = 'center';
+      c.textBaseline = 'alphabetic';
+      c.fillStyle = color;
+      c.fillText(letter, w / 2, h / 2 + size * 0.35);
+    }
+    paintLetter(ctx, '#E9E4DA');
+
+    // Puntos de la letra para saber cuánto ha repasado.
+    const off = document.createElement('canvas');
+    off.width = w;
+    off.height = h;
+    const octx = off.getContext('2d');
+    paintLetter(octx, '#000');
+    const data = octx.getImageData(0, 0, w, h).data;
+    const pts = [];
+    for (let y = 5; y < h; y += 10) {
+      for (let x = 5; x < w; x += 10) {
+        if (data[(y * w + x) * 4 + 3] > 128) pts.push({ x: x, y: y, hit: false });
+      }
+    }
+
+    const brush = size * 0.12;
+    const reach = brush / 2 + 8;
+
+    // Zona "cerca de la letra": la letra ensanchada un trazo por cada lado.
+    const cell = 10;
+    const cols = Math.ceil(w / cell);
+    const near = [];
+    const r = Math.ceil(brush / cell);
+    pts.forEach(p => {
+      const cx = Math.floor(p.x / cell);
+      const cy = Math.floor(p.y / cell);
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (dx * dx + dy * dy <= r * r) near[(cy + dy) * cols + cx + dx] = true;
+        }
+      }
+    });
+    let inked = 0;
+    let outside = 0;
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = brush;
+    ctx.strokeStyle = '#B9714B';
+
+    let last = null;
+    function point(ev) {
+      const r = canvas.getBoundingClientRect();
+      const t = ev.changedTouches ? ev.changedTouches[0] : ev;
+      return { x: t.clientX - r.left, y: t.clientY - r.top };
+    }
+    function draw(a, b) {
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      pts.forEach(p => { if (!p.hit && segmentDistance(p, a, b) <= reach) p.hit = true; });
+      const steps = Math.max(1, Math.round(Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y)) / 4));
+      for (let i = 0; i < steps; i++) {
+        const x = a.x + (b.x - a.x) * i / steps;
+        const y = a.y + (b.y - a.y) * i / steps;
+        inked++;
+        if (!near[Math.floor(y / cell) * cols + Math.floor(x / cell)]) outside++;
+      }
+    }
+    function start(ev) {
+      if (g.solved) return;
+      ev.preventDefault();
+      lastTouch = Date.now();
+      last = point(ev);
+      draw(last, last);
+    }
+    function move(ev) {
+      if (!last) return;
+      ev.preventDefault();
+      const p = point(ev);
+      draw(last, p);
+      last = p;
+    }
+    function end() {
+      if (!last) return;
+      last = null;
+      if (g.solved) return;
+      if (inked > 60 && outside / inked > 0.4) {
+        g.solved = true;
+        speak('¡Uy! Repasa solo la letra.');
+        gameTimer = setTimeout(() => {
+          if (ui.game !== g) return;
+          g.solved = false;
+          renderGame();
+        }, 1200);
+        return;
+      }
+      const hits = pts.filter(p => p.hit).length;
+      if (pts.length && hits / pts.length >= 0.75) {
+        paintLetter(ctx, 'rgba(110, 154, 94, 0.55)');
+        letterTraced(g);
+      }
+    }
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', end);
+    canvas.addEventListener('touchcancel', end);
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', end);
+    canvas.addEventListener('mouseleave', end);
+  }
+
+  function letterTraced(g) {
+    g.solved = true;
+    const box = document.getElementById('trace-box');
+    if (box) box.className += ' is-done';
+    chime();
+    speak('¡La ' + g.letters[g.idx] + '! ¡Muy bien!');
+    gameTimer = setTimeout(() => {
+      if (ui.game !== g) return;
+      g.idx++;
+      g.solved = false;
+      if (g.idx >= g.letters.length) {
+        finishGame(state.name ? '¡Has escrito ' + state.name + '!' : '¡Has escrito las vocales!');
+        return;
+      }
+      renderGame();
+      speak('Ahora, la ' + g.letters[g.idx]);
+    }, 1600);
   }
 
   // ---------------------------------------------------------------------------
@@ -682,6 +1095,10 @@
       '" data-i="' + i + '"' + (dir ? ' data-dir="' + dir + '"' : '') + (disabled ? ' disabled' : '') + '>' + label + '</button>';
   }
 
+  function field(label, input) {
+    return '<label class="field"><span>' + label + '</span>' + input + '</label>';
+  }
+
   function usedOn(id) {
     const days = [];
     for (let d = 1; d <= 7; d++) {
@@ -730,7 +1147,8 @@
     },
 
     actividades: () => {
-      let html = '<p class="muted">Toca una actividad para cambiar su dibujo o su nombre. El cambio se aplica a todos los días.</p>';
+      let html = '<p class="muted">Toca una actividad para cambiar su dibujo o su nombre. El cambio se aplica a todos los días. ' +
+        'El «Juego del día» abre los juegos (contar, escribir su nombre y parejas).</p>';
       html += '<div class="pick-grid">';
       Object.keys(state.library).forEach(id => {
         const a = state.library[id];
@@ -745,45 +1163,73 @@
 
     fechas: () => {
       const d = ui.evDraft;
+      const cumple = d.kind === 'cumple';
       let html = '<section class="p-card"><h3>Añadir una fecha especial</h3>';
-      html += '<p class="muted small">Cumpleaños, excursiones, visitas, días sin cole…</p>';
+      html += '<div class="p-row"><div class="seg">' +
+        '<button class="seg-btn' + (cumple ? ' is-on' : '') + '" data-act="ev-kind" data-kind="cumple">🎂 Cumpleaños</button>' +
+        '<button class="seg-btn' + (cumple ? '' : ' is-on') + '" data-act="ev-kind" data-kind="otro">📅 Otra fecha</button>' +
+        '</div></div>';
+      html += '<p class="muted small">' + (cumple
+        ? 'Se repite cada año y la app dice cuántos años cumple.'
+        : 'Excursiones, visitas, días sin cole…') + '</p>';
       html += '<div class="form-grid">';
-      html += '<label class="field"><span>Día</span><input type="date" data-model="ev:date" value="' + esc(d.date) + '"></label>';
-      html += '<label class="field"><span>Qué es</span><input type="text" data-model="ev:label" value="' + esc(d.label) +
-        '" placeholder="Ej.: Cumple de la abuela" maxlength="40" autocomplete="off"></label>';
-      html += '<label class="field"><span>Cuándo</span><select data-model="ev:slot">';
-      EVENT_WHEN.forEach(w => {
-        html += '<option value="' + w.id + '"' + (d.slot === w.id ? ' selected' : '') + '>' + w.label + '</option>';
-      });
-      html += '</select></label></div>';
-      html += '<div class="emoji-row">';
-      EVENT_EMOJIS.forEach(e => {
-        html += '<button class="emo' + (e === d.emoji ? ' is-on' : '') + '" data-act="ev-emoji" data-e="' + e + '">' + e + '</button>';
-      });
-      html += '</div>';
-      html += '<div class="p-row"><label class="check"><input type="checkbox" data-model="ev:noCole"' + (d.noCole ? ' checked' : '') +
-        '> Ese día no hay cole</label>';
-      if (d.noCole) {
-        html += '<span class="muted">y se usa la rutina del&nbsp;</span><select class="inline" data-model="ev:useDay">';
-        for (let i = 1; i <= 7; i++) {
-          html += '<option value="' + i + '"' + (+d.useDay === i ? ' selected' : '') + '>' + DAY_NAMES[i] + '</option>';
+      if (cumple) {
+        html += field('Día del cumple', '<input type="date" data-model="ev:date" value="' + esc(d.date) + '">');
+        html += field('¿De quién es?', '<input type="text" data-model="ev:who" value="' + esc(d.who) +
+          '" placeholder="Ej.: la abuela" maxlength="30" autocomplete="off">');
+        html += field('Año de nacimiento', '<input type="number" inputmode="numeric" pattern="[0-9]*" min="1900" max="' +
+          today().getFullYear() + '" data-model="ev:birthYear" value="' + esc(d.birthYear) + '" placeholder="Ej.: 1956">');
+        html += '</div>';
+      } else {
+        html += field('Día', '<input type="date" data-model="ev:date" value="' + esc(d.date) + '">');
+        html += field('Qué es', '<input type="text" data-model="ev:label" value="' + esc(d.label) +
+          '" placeholder="Ej.: Excursión a la granja" maxlength="40" autocomplete="off">');
+        let when = '<select data-model="ev:slot">';
+        EVENT_WHEN.forEach(w => {
+          when += '<option value="' + w.id + '"' + (d.slot === w.id ? ' selected' : '') + '>' + w.label + '</option>';
+        });
+        html += field('Cuándo', when + '</select>');
+        html += '</div><div class="emoji-row">';
+        EVENT_EMOJIS.forEach(e => {
+          html += '<button class="emo' + (e === d.emoji ? ' is-on' : '') + '" data-act="ev-emoji" data-e="' + e + '">' + e + '</button>';
+        });
+        html += '</div>';
+        html += '<div class="p-row"><label class="check"><input type="checkbox" data-model="ev:noCole"' + (d.noCole ? ' checked' : '') +
+          '> Ese día no hay cole</label>';
+        if (d.noCole) {
+          html += '<span class="muted">y se usa la rutina del&nbsp;</span><select class="inline" data-model="ev:useDay">';
+          for (let i = 1; i <= 7; i++) {
+            html += '<option value="' + i + '"' + (+d.useDay === i ? ' selected' : '') + '>' + DAY_NAMES[i] + '</option>';
+          }
+          html += '</select>';
         }
-        html += '</select>';
+        html += '</div>';
       }
-      html += '</div>';
       html += '<div class="modal-actions"><span class="spacer"></span><button class="btn primary" data-act="ev-add">Añadir fecha</button></div>';
       html += '</section>';
 
       const tKey = todayKey();
-      const upcoming = state.events.filter(e => e.date >= tKey).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      const upcoming = state.events
+        .map(e => ({ e: e, next: nextDate(e, tKey) }))
+        .filter(x => x.next >= tKey)
+        .sort((a, b) => (a.next < b.next ? -1 : a.next > b.next ? 1 : 0));
       html += '<section class="p-card"><h3>Próximas fechas</h3>';
       if (!upcoming.length) html += '<p class="muted">Todavía no hay ninguna.</p>';
-      upcoming.forEach(e => {
-        const when = EVENT_WHEN.filter(w => w.id === e.slot)[0];
-        html += '<div class="ev-row"><span class="ev-date">' + shortDate(parseKey(e.date)) + '</span>' +
-          '<span class="p-emoji">' + esc(e.emoji) + '</span><span class="p-text">' + esc(e.label) + '</span>' +
-          '<span class="tag">' + (e.slot === 'dia' ? 'Todo el día' : esc(when ? when.label : '')) + '</span>' +
-          (e.noCole ? '<span class="tag">Sin cole</span>' : '') +
+      upcoming.forEach(x => {
+        const e = x.e;
+        let text;
+        let tags;
+        if (e.kind === 'cumple') {
+          const age = +x.next.slice(0, 4) - e.birthYear;
+          text = 'Cumple de ' + e.who;
+          tags = '<span class="tag">Cada año</span>' + (age > 0 ? '<span class="tag">Cumple ' + age + '</span>' : '');
+        } else {
+          const when = EVENT_WHEN.filter(w => w.id === e.slot)[0];
+          text = e.label;
+          tags = '<span class="tag">' + esc(when ? when.label : '') + '</span>' + (e.noCole ? '<span class="tag">Sin cole</span>' : '');
+        }
+        html += '<div class="ev-row"><span class="ev-date">' + shortDate(parseKey(x.next)) + '</span>' +
+          '<span class="p-emoji">' + esc(e.emoji) + '</span><span class="p-text">' + esc(text) + '</span>' + tags +
           '<button class="ib danger" data-act="ev-rm" data-id="' + esc(e.id) + '" aria-label="Quitar">✕</button></div>';
       });
       html += '</section>';
@@ -792,8 +1238,8 @@
 
     ajustes: () => {
       let html = '<section class="p-card">';
-      html += '<label class="field"><span>Nombre del peque (para el saludo)</span><input type="text" data-model="set:name" value="' +
-        esc(state.name) + '" maxlength="20" autocomplete="off"></label>';
+      html += field('Nombre del peque (para el saludo y el juego de escribir)', '<input type="text" data-model="set:name" value="' +
+        esc(state.name) + '" maxlength="20" autocomplete="off">');
       html += '<div class="p-row"><span class="p-label">Voz y sonidos</span>' +
         '<button class="switch' + (state.sound ? ' is-on' : '') + '" data-act="toggle-sound" aria-label="Voz y sonidos"><span></span></button>' +
         '<span class="spacer"></span><button class="btn ghost" data-act="say" data-text="¡Hola! Así suena mi voz.">Probar la voz</button></div>';
@@ -802,8 +1248,8 @@
       html += '<section class="p-card"><h3>Partes del día</h3>';
       html += '<p class="muted small">La app abre sola la parte del día que toca.</p>';
       html += '<div class="form-grid">';
-      html += '<label class="field"><span>La tarde empieza a las</span><input type="time" data-model="set:tardeFrom" value="' + esc(state.tardeFrom) + '"></label>';
-      html += '<label class="field"><span>La noche empieza a las</span><input type="time" data-model="set:nocheFrom" value="' + esc(state.nocheFrom) + '"></label>';
+      html += field('La tarde empieza a las', '<input type="time" data-model="set:tardeFrom" value="' + esc(state.tardeFrom) + '">');
+      html += field('La noche empieza a las', '<input type="time" data-model="set:nocheFrom" value="' + esc(state.nocheFrom) + '">');
       html += '</div></section>';
 
       html += '<section class="p-card"><h3>Para que no salga de la app</h3>';
@@ -820,19 +1266,19 @@
   function setModel(path, value) {
     const p = path.split(':');
     const scope = p[0];
-    const field = p[1];
+    const key = p[1];
     if (scope === 'draft' && ui.modal && ui.modal.draft) {
-      ui.modal.draft[field] = value;
-      if (field === 'emoji') {
+      ui.modal.draft[key] = value;
+      if (key === 'emoji') {
         const preview = document.getElementById('edit-preview');
         if (preview) preview.textContent = value.trim() || '⭐';
       }
     } else if (scope === 'ev') {
-      ui.evDraft[field] = value;
+      ui.evDraft[key] = value;
     } else if (scope === 'set') {
-      state[field] = value;
+      state[key] = value;
       save();
-      if (field === 'tardeFrom' || field === 'nocheFrom') ui.nowSlot = currentSlot();
+      if (key === 'tardeFrom' || key === 'nocheFrom') ui.nowSlot = currentSlot();
     }
   }
 
@@ -846,7 +1292,8 @@
       return;
     }
     const id = m.id || newId('a');
-    state.library[id] = { emoji: emoji, label: label };
+    // Object.assign conserva marcas como `game` al editar.
+    state.library[id] = Object.assign({}, state.library[id], { emoji: emoji, label: label });
     if (m.addTo) state.week[m.addTo.day].items[m.addTo.slot].push(id);
     save();
     closeModal();
@@ -870,26 +1317,44 @@
 
   function addEvent() {
     const d = ui.evDraft;
-    const label = String(d.label || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date)) {
       window.alert('Elige el día.');
       return;
     }
-    if (!label && !d.noCole) {
-      window.alert('Escribe qué es.');
-      return;
+    if (d.kind === 'cumple') {
+      const who = String(d.who || '').trim();
+      const thisYear = today().getFullYear();
+      let year = parseInt(d.birthYear, 10);
+      // Si en el calendario se eligió la fecha de nacimiento completa, el año sale de ahí.
+      if (!year && +d.date.slice(0, 4) < thisYear) year = +d.date.slice(0, 4);
+      if (!who) {
+        window.alert('Escribe de quién es el cumple.');
+        return;
+      }
+      if (!(year >= 1900 && year <= thisYear)) {
+        window.alert('Escribe el año de nacimiento (por ejemplo, 1956).');
+        return;
+      }
+      state.events.push({ id: newId('e'), kind: 'cumple', date: d.date, who: who, birthYear: year, emoji: '🎂', slot: 'dia' });
+    } else {
+      const label = String(d.label || '').trim();
+      if (!label && !d.noCole) {
+        window.alert('Escribe qué es.');
+        return;
+      }
+      state.events.push({
+        id: newId('e'),
+        kind: 'otro',
+        date: d.date,
+        emoji: d.emoji,
+        label: label || 'No hay cole',
+        slot: d.slot,
+        noCole: !!d.noCole,
+        useDay: +d.useDay || 6
+      });
     }
-    state.events.push({
-      id: newId('e'),
-      date: d.date,
-      emoji: d.emoji,
-      label: label || 'No hay cole',
-      slot: d.slot,
-      noCole: !!d.noCole,
-      useDay: +d.useDay || 6
-    });
     save();
-    ui.evDraft = newEventDraft();
+    ui.evDraft = newEventDraft(d.kind);
     renderParent();
   }
 
@@ -924,6 +1389,89 @@
     },
     'card': el => toggleCard(el.getAttribute('data-key')),
     'hide-celebrate': hideCelebrate,
+
+    'game-back': () => {
+      if (ui.game.view === 'menu') {
+        closeGame();
+        return;
+      }
+      clearTimeout(gameTimer);
+      ui.game.view = 'menu';
+      renderGame();
+    },
+    'game-open': el => startGame(el.getAttribute('data-game')),
+    'count-tap': el => {
+      const g = ui.game;
+      const i = +el.getAttribute('data-i');
+      if (g.counted.indexOf(i) < 0) g.counted.push(i);
+      renderGame();
+      speak(String(g.counted.indexOf(i) + 1));
+    },
+    'count-answer': el => {
+      const g = ui.game;
+      const n = +el.getAttribute('data-n');
+      if (g.solved) return;
+      if (n !== g.n) {
+        g.wrong.push(n);
+        renderGame();
+        speak('Casi. ¡Vuelve a contar!');
+        return;
+      }
+      g.solved = true;
+      g.round++;
+      renderGame();
+      chime();
+      speak('¡Sí! Hay ' + n + ' ' + g.thing.a + '.');
+      gameTimer = setTimeout(() => {
+        if (ui.game !== g) return;
+        if (g.round >= COUNT_ROUNDS) {
+          finishGame('¡Muy bien! ¡Has contado todo!');
+          return;
+        }
+        newCountRound(g);
+        renderGame();
+        speak(g.thing.q);
+      }, 2200);
+    },
+    'trace-clear': () => {
+      if (ui.game.solved) return;
+      renderGame();
+    },
+    'pair-flip': el => {
+      const g = ui.game;
+      const c = g.cards[+el.getAttribute('data-i')];
+      if (g.lock || c.open || c.matched) return;
+      c.open = true;
+      if (g.first < 0) {
+        g.first = +el.getAttribute('data-i');
+        renderGame();
+        return;
+      }
+      const a = g.cards[g.first];
+      g.first = -1;
+      if (a.e === c.e) {
+        a.matched = true;
+        c.matched = true;
+        renderGame();
+        chime();
+        speak('¡Pareja!');
+        if (g.cards.every(x => x.matched)) {
+          gameTimer = setTimeout(() => {
+            if (ui.game === g) finishGame('¡Muy bien! ¡Has encontrado todas las parejas!');
+          }, 1200);
+        }
+        return;
+      }
+      g.lock = true;
+      renderGame();
+      gameTimer = setTimeout(() => {
+        if (ui.game !== g) return;
+        a.open = false;
+        c.open = false;
+        g.lock = false;
+        renderGame();
+      }, 1100);
+    },
 
     'gate': openGate,
     'key': el => gateKey(el.getAttribute('data-k')),
@@ -1004,6 +1552,10 @@
       closeModal();
       renderParent();
     },
+    'ev-kind': el => {
+      ui.evDraft.kind = el.getAttribute('data-kind');
+      renderParent();
+    },
     'ev-emoji': el => {
       ui.evDraft.emoji = el.getAttribute('data-e');
       renderParent();
@@ -1074,10 +1626,10 @@
     }
     if (slot !== ui.nowSlot) {
       ui.nowSlot = slot;
-      if (ui.date === tKey) ui.slot = slot;
+      if (ui.date === tKey && !ui.game) ui.slot = slot;
       changed = true;
     }
-    if (!ui.parent && (ui.date !== tKey || ui.weekOffset !== 0) && Date.now() - lastTouch > 3 * 60 * 1000) {
+    if (!ui.parent && !ui.game && (ui.date !== tKey || ui.weekOffset !== 0) && Date.now() - lastTouch > 3 * 60 * 1000) {
       goToday();
       changed = true;
     }

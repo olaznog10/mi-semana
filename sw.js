@@ -4,7 +4,7 @@
  * guardado y, por detrás, se trae la versión nueva para la próxima vez.
  * Sube CACHE cuando cambie la lista de ficheros.
  */
-var CACHE = 'mi-semana-v1';
+var CACHE = 'mi-semana-v2';
 var FILES = [
   './',
   './index.html',
